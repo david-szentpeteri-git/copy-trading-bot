@@ -1,0 +1,5 @@
+.env
+logs/trades.json
+logs/positions.json
+__pycache__/
+*.pyc

@@ -74,13 +74,20 @@ def poll_new_trades(
             if tx_hash in seen_hashes:
                 continue
 
-            # Only copy BUY trades — selling is position management by the trader
-            if trade.get("side", "").upper() != "BUY":
+            side = trade.get("side", "").upper()
+
+            # Only process BUY and SELL — ignore splits, merges, etc.
+            if side not in ("BUY", "SELL"):
                 seen_hashes.add(tx_hash)
                 continue
 
-            # Attach the source trader address for downstream sizing logic
+            # Attach the source trader address for downstream sizing/sell logic
             trade["trader_address"] = address
+
+            # Ensure slug is present — used for logging and the dashboard
+            # Bullpen puts it in "slug" but fall back to condition_id if missing
+            if not trade.get("slug"):
+                trade["slug"] = trade.get("condition_id", "unknown")
 
             yield trade
 

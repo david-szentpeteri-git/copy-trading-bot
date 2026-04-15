@@ -94,6 +94,19 @@ def get_own_balances() -> Dict:
     return _run(["portfolio", "balances"])
 
 
+def get_own_positions() -> List[Dict]:
+    """Fetch our own open Polymarket positions.
+
+    Used to recover position state after a restart when the local
+    positions file is unavailable.
+
+    Returns:
+        List of position dicts. Each entry includes 'condition_id',
+        'outcome', and 'size' (token balance).
+    """
+    return _run(["polymarket", "positions"])
+
+
 def place_buy(condition_id: str, outcome: str, amount_usdc: float) -> Dict:
     """Place a market buy order on Polymarket.
 
@@ -113,4 +126,26 @@ def place_buy(condition_id: str, outcome: str, amount_usdc: float) -> Dict:
         condition_id,
         outcome,
         str(amount_usdc),
+    ])
+
+
+def place_sell(condition_id: str, outcome: str, amount_tokens: float) -> Dict:
+    """Place a market sell order on Polymarket.
+
+    Args:
+        condition_id: The market's condition ID (hex string).
+        outcome: The outcome label to sell (e.g. "Yes", "Trail Blazers").
+        amount_tokens: Number of outcome tokens to sell.
+
+    Returns:
+        Dict with order confirmation details from the CLI.
+
+    Raises:
+        RuntimeError: If the order fails to execute.
+    """
+    return _run([
+        "polymarket", "sell",
+        condition_id,
+        outcome,
+        str(amount_tokens),
     ])

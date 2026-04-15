@@ -23,6 +23,8 @@ class Config:
         poll_interval_seconds: How often (in seconds) to poll for new trades.
         bullpen_bin: Path to the bullpen CLI binary inside WSL.
         seen_trades_file: Path to persist already-copied trade hashes.
+        positions_file: Path to persist our active position state.
+        trade_log_file: Path to the append-only JSON trade log for the dashboard.
     """
 
     traders: List[str] = field(default_factory=lambda: [
@@ -49,6 +51,12 @@ class Config:
 
     # File to store already-processed transaction hashes (prevents double-copying)
     seen_trades_file: str = os.getenv("SEEN_TRADES_FILE", "/home/david/.bullpen/seen_trades.json")
+
+    # File to persist active position state (our tokens held per market/outcome)
+    positions_file: str = os.getenv("POSITIONS_FILE", "logs/positions.json")
+
+    # Append-only JSON log of every trade event — consumed by the future dashboard
+    trade_log_file: str = os.getenv("TRADE_LOG_FILE", "logs/trades.json")
 
 
 # Module-level singleton — import this everywhere
