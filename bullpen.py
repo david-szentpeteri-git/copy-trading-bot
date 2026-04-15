@@ -7,6 +7,7 @@ directly.
 
 import json
 import subprocess
+import sys
 from typing import Any, Dict, List, Optional
 
 from config import config
@@ -14,6 +15,9 @@ from config import config
 
 def _run(args: List[str]) -> Any:
     """Execute a bullpen CLI command and return the parsed JSON output.
+
+    On Windows, prefixes the command with `wsl` so the Linux bullpen
+    binary inside WSL is invoked transparently.
 
     Args:
         args: CLI arguments to pass after `bullpen`, e.g.
@@ -26,7 +30,11 @@ def _run(args: List[str]) -> Any:
         RuntimeError: If the CLI exits with a non-zero status code.
         json.JSONDecodeError: If the output is not valid JSON.
     """
-    cmd = [config.bullpen_bin] + args + ["--output", "json"]
+    bullpen_cmd = [config.bullpen_bin] + args + ["--output", "json"]
+
+    # On Windows the bullpen binary lives inside WSL — prefix with `wsl` to cross the boundary
+    cmd = (["wsl"] + bullpen_cmd) if sys.platform == "win32" else bullpen_cmd
+
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
@@ -92,6 +100,26 @@ def get_own_balances() -> Dict:
         Dict containing balance information including 'polymarket' USDC amount.
     """
     return _run(["portfolio", "balances"])
+
+
+def get_price(condition_id: str, outcome: str) -> Optional[float]:
+    """Fetch the current midpoint price for a market outcome.
+
+    Used to calculate unrealized PnL on open positions.
+
+    Args:
+        condition_id: Polymarket market condition ID.
+        outcome: Outcome label (e.g. "Yes", "Trail Blazers").
+
+    Returns:
+        Midpoint price as a float (0.0–1.0), or None if unavailable.
+    """
+    try:
+        data = _run(["polymarket", "price", condition_id, outcome])
+        # Bullpen returns a dict with 'mid', 'best_bid', 'best_ask', etc.
+        return float(data.get("mid") or data.get("last") or 0)
+    except Exception:
+        return None
 
 
 def get_own_positions() -> List[Dict]:

@@ -42,6 +42,7 @@ def log_buy_executed(
     title: str,
     trader_usdc_size: float,
     our_usdc_size: float,
+    our_tokens: float,
     trader_portfolio_est: float,
     own_balance: float,
     trade_pct: float,
@@ -58,6 +59,7 @@ def log_buy_executed(
         title: Human-readable market title.
         trader_usdc_size: USDC the tracked trader spent.
         our_usdc_size: USDC we spent.
+        our_tokens: Number of outcome tokens we received.
         trader_portfolio_est: Estimated portfolio value of the tracked trader.
         own_balance: Our USDC balance at time of trade.
         trade_pct: Portfolio fraction used (0.0–1.0).
@@ -74,6 +76,7 @@ def log_buy_executed(
         "title": title,
         "trader_usdc_size": trader_usdc_size,
         "our_usdc_size": our_usdc_size,
+        "our_tokens": our_tokens,
         "trader_portfolio_est": trader_portfolio_est,
         "own_balance": own_balance,
         "trade_pct": round(trade_pct, 6),
@@ -91,6 +94,7 @@ def log_sell_executed(
     title: str,
     sell_pct: float,
     tokens_sold: float,
+    usdc_received: float,
     their_tx_hash: str,
     our_tx_hash: Optional[str] = None,
 ) -> None:
@@ -104,6 +108,7 @@ def log_sell_executed(
         title: Human-readable market title.
         sell_pct: Fraction of the trader's position they sold (0.0–1.0).
         tokens_sold: Number of tokens we sold.
+        usdc_received: USDC received from the sell — used for realized PnL.
         their_tx_hash: Transaction hash of the tracked sell.
         our_tx_hash: Transaction hash of our sell order, if available.
     """
@@ -117,6 +122,7 @@ def log_sell_executed(
         "title": title,
         "sell_pct": round(sell_pct, 6),
         "tokens_sold": tokens_sold,
+        "usdc_received": usdc_received,
         "their_tx_hash": their_tx_hash,
         "our_tx_hash": our_tx_hash,
         "error": None,

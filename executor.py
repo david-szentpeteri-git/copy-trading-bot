@@ -125,6 +125,7 @@ def _execute_buy(trade: Dict) -> bool:
             title=title,
             trader_usdc_size=trader_usdc_spent,
             our_usdc_size=size,
+            our_tokens=our_tokens,
             trader_portfolio_est=trader_portfolio,
             own_balance=own_balance,
             trade_pct=trade_pct,
@@ -204,6 +205,9 @@ def _execute_sell(trade: Dict) -> bool:
         result = bullpen.place_sell(condition_id, outcome, tokens_to_sell)
         our_tx_hash = result.get("transaction_hash")
 
+        # Extract USDC received from the sell result for realized PnL tracking
+        usdc_received = float(result.get("usdc_size", 0) or result.get("cash", 0) or 0)
+
         # Update our position state to reflect the sold tokens
         state.update_after_sell(condition_id, outcome, tokens_to_sell)
 
@@ -215,6 +219,7 @@ def _execute_sell(trade: Dict) -> bool:
             title=title,
             sell_pct=sell_pct,
             tokens_sold=tokens_to_sell,
+            usdc_received=usdc_received,
             their_tx_hash=their_tx_hash,
             our_tx_hash=our_tx_hash,
         )
