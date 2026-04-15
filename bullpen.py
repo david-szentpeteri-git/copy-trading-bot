@@ -3,11 +3,17 @@
 All subprocess calls to `bullpen` go through this module so the rest
 of the codebase never has to deal with JSON parsing or subprocess errors
 directly.
+
+When dry run mode is active, place_buy() and place_sell() return a
+simulated result using the live market price instead of executing real
+orders. All other read-only calls (prices, positions, activity) always
+hit the real API so PnL data stays realistic.
 """
 
 import json
 import subprocess
 import sys
+import uuid
 from typing import Any, Dict, List, Optional
 
 from config import config
@@ -125,12 +131,12 @@ def get_price(condition_id: str, outcome: str) -> Optional[float]:
 def get_own_positions() -> List[Dict]:
     """Fetch our own open Polymarket positions.
 
-    Used to recover position state after a restart when the local
-    positions file is unavailable.
+    Used to recover position state after a restart and for auto-redeem
+    checks.
 
     Returns:
         List of position dicts. Each entry includes 'condition_id',
-        'outcome', and 'size' (token balance).
+        'outcome', 'size' (token balance), and resolution status fields.
     """
     return _run(["polymarket", "positions"])
 
@@ -138,17 +144,33 @@ def get_own_positions() -> List[Dict]:
 def place_buy(condition_id: str, outcome: str, amount_usdc: float) -> Dict:
     """Place a market buy order on Polymarket.
 
+    In dry run mode, returns a simulated result using the live mid price
+    to estimate tokens received — no real order is placed.
+
     Args:
         condition_id: The market's condition ID (hex string).
         outcome: The outcome label to buy (e.g. "Yes", "Trail Blazers").
         amount_usdc: Amount of USDC to spend on this trade.
 
     Returns:
-        Dict with order confirmation details from the CLI.
+        Dict with order confirmation details (real or simulated).
 
     Raises:
-        RuntimeError: If the order fails to execute.
+        RuntimeError: If the order fails to execute (live mode only).
     """
+    import dry_run
+    if dry_run.is_enabled():
+        # Simulate the buy using the live price to estimate token quantity
+        price = get_price(condition_id, outcome) or 0.5
+        simulated_tokens = round(amount_usdc / price, 6) if price > 0 else 0
+        return {
+            "transaction_hash": f"DRY_RUN_{uuid.uuid4().hex[:16]}",
+            "size": simulated_tokens,
+            "usdc_size": amount_usdc,
+            "price": price,
+            "dry_run": True,
+        }
+
     return _run([
         "polymarket", "buy",
         condition_id,
@@ -160,20 +182,54 @@ def place_buy(condition_id: str, outcome: str, amount_usdc: float) -> Dict:
 def place_sell(condition_id: str, outcome: str, amount_tokens: float) -> Dict:
     """Place a market sell order on Polymarket.
 
+    In dry run mode, returns a simulated result using the live mid price
+    to estimate USDC received — no real order is placed.
+
     Args:
         condition_id: The market's condition ID (hex string).
         outcome: The outcome label to sell (e.g. "Yes", "Trail Blazers").
         amount_tokens: Number of outcome tokens to sell.
 
     Returns:
-        Dict with order confirmation details from the CLI.
+        Dict with order confirmation details (real or simulated).
 
     Raises:
-        RuntimeError: If the order fails to execute.
+        RuntimeError: If the order fails to execute (live mode only).
     """
+    import dry_run
+    if dry_run.is_enabled():
+        # Simulate the sell using the live price to estimate USDC received
+        price = get_price(condition_id, outcome) or 0.5
+        simulated_usdc = round(amount_tokens * price, 6)
+        return {
+            "transaction_hash": f"DRY_RUN_{uuid.uuid4().hex[:16]}",
+            "usdc_size": simulated_usdc,
+            "size": amount_tokens,
+            "price": price,
+            "dry_run": True,
+        }
+
     return _run([
         "polymarket", "sell",
         condition_id,
         outcome,
         str(amount_tokens),
     ])
+
+
+def redeem_position(condition_id: str) -> Dict:
+    """Redeem resolved winning tokens for USDC.
+
+    Called automatically when the bot detects a market in our position
+    state has resolved in our favour.
+
+    Args:
+        condition_id: Polymarket market condition ID of the resolved market.
+
+    Returns:
+        Dict with redemption confirmation details from the CLI.
+
+    Raises:
+        RuntimeError: If the redemption fails.
+    """
+    return _run(["polymarket", "redeem", condition_id])

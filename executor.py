@@ -9,6 +9,7 @@ import logging
 from typing import Dict
 
 import bullpen
+import dry_run
 import portfolio
 import state
 import trade_log
@@ -131,6 +132,7 @@ def _execute_buy(trade: Dict) -> bool:
             trade_pct=trade_pct,
             their_tx_hash=their_tx_hash,
             our_tx_hash=our_tx_hash,
+            is_dry_run=dry_run.is_enabled(),
         )
 
         logger.info("BUY order placed — tx: %s | tokens received: %.4f", our_tx_hash, our_tokens)
@@ -222,6 +224,7 @@ def _execute_sell(trade: Dict) -> bool:
             usdc_received=usdc_received,
             their_tx_hash=their_tx_hash,
             our_tx_hash=our_tx_hash,
+            is_dry_run=dry_run.is_enabled(),
         )
 
         logger.info("SELL order placed — tx: %s | tokens sold: %.4f", our_tx_hash, tokens_to_sell)

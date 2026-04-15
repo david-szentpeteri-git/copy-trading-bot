@@ -15,8 +15,10 @@ import time
 from datetime import datetime, timezone
 
 from config import config
+import dry_run
 from executor import handle_trade
 from monitor import get_since_timestamp, load_seen_trades, poll_new_trades, save_seen_trades
+import redeemer
 import state
 
 # Configure structured logging to stdout with timestamps
@@ -45,6 +47,9 @@ def run() -> None:
     logger.info("Copy trading bot starting up")
     logger.info("Tracking %d traders: %s", len(config.traders), config.traders)
     logger.info("Trade cap: $%.2f USDC | Poll interval: %ds", config.trade_cap_usdc, config.poll_interval_seconds)
+
+    if dry_run.is_enabled():
+        logger.info("🧪 DRY RUN MODE ACTIVE — no real orders will be placed")
 
     # Load position state first — needed by executor to handle SELL trades
     state.load()
@@ -88,6 +93,12 @@ def run() -> None:
             save_seen_trades(seen_hashes)
         else:
             logger.info("No new trades found")
+
+        # Auto-redeem any resolved winning positions (skipped in dry run)
+        if not dry_run.is_enabled():
+            redeemed = redeemer.check_and_redeem()
+            if redeemed:
+                logger.info("Auto-redeemed %d resolved position(s)", redeemed)
 
         # Advance the lookback window to now so the next cycle is incremental
         since = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

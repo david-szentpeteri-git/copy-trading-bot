@@ -34,6 +34,35 @@ def _append(entry: Dict[str, Any]) -> None:
         f.write(json.dumps(entry) + "\n")
 
 
+def log_redeemed(
+    condition_id: str,
+    outcome: str,
+    title: str,
+    slug: str,
+    usdc_redeemed: float,
+) -> None:
+    """Log a successful automatic redemption of resolved winning tokens.
+
+    Args:
+        condition_id: Polymarket condition ID of the resolved market.
+        outcome: The winning outcome we held.
+        title: Human-readable market title.
+        slug: Market URL slug.
+        usdc_redeemed: USDC received from the redemption.
+    """
+    _append({
+        "event": "REDEEMED",
+        "timestamp": _now_iso(),
+        "condition_id": condition_id,
+        "outcome": outcome,
+        "title": title,
+        "slug": slug,
+        "usdc_redeemed": usdc_redeemed,
+        "dry_run": False,
+        "error": None,
+    })
+
+
 def log_buy_executed(
     trader_address: str,
     slug: str,
@@ -48,6 +77,7 @@ def log_buy_executed(
     trade_pct: float,
     their_tx_hash: str,
     our_tx_hash: Optional[str] = None,
+    is_dry_run: bool = False,
 ) -> None:
     """Log a successfully executed BUY copy trade.
 
@@ -65,6 +95,7 @@ def log_buy_executed(
         trade_pct: Portfolio fraction used (0.0–1.0).
         their_tx_hash: Transaction hash of the copied trade.
         our_tx_hash: Transaction hash of our executed order, if available.
+        is_dry_run: True if this was a simulated trade, False for real.
     """
     _append({
         "event": "BUY_EXECUTED",
@@ -82,6 +113,7 @@ def log_buy_executed(
         "trade_pct": round(trade_pct, 6),
         "their_tx_hash": their_tx_hash,
         "our_tx_hash": our_tx_hash,
+        "dry_run": is_dry_run,
         "error": None,
     })
 
@@ -97,6 +129,7 @@ def log_sell_executed(
     usdc_received: float,
     their_tx_hash: str,
     our_tx_hash: Optional[str] = None,
+    is_dry_run: bool = False,
 ) -> None:
     """Log a successfully executed SELL copy trade.
 
@@ -111,6 +144,7 @@ def log_sell_executed(
         usdc_received: USDC received from the sell — used for realized PnL.
         their_tx_hash: Transaction hash of the tracked sell.
         our_tx_hash: Transaction hash of our sell order, if available.
+        is_dry_run: True if this was a simulated trade, False for real.
     """
     _append({
         "event": "SELL_EXECUTED",
@@ -125,6 +159,7 @@ def log_sell_executed(
         "usdc_received": usdc_received,
         "their_tx_hash": their_tx_hash,
         "our_tx_hash": our_tx_hash,
+        "dry_run": is_dry_run,
         "error": None,
     })
 
@@ -151,6 +186,7 @@ def log_failed(
         their_tx_hash: Transaction hash of the original trade.
         error: Human-readable reason for the failure or skip.
     """
+    import dry_run as _dry_run
     _append({
         "event": event_type,
         "timestamp": _now_iso(),
@@ -160,5 +196,6 @@ def log_failed(
         "outcome": outcome,
         "title": title,
         "their_tx_hash": their_tx_hash,
+        "dry_run": _dry_run.is_enabled(),
         "error": error,
     })
