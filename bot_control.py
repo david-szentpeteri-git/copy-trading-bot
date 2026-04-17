@@ -25,11 +25,16 @@ def start() -> bool:
     if is_running():
         return False
 
-    # Launch the bot with the same Python interpreter running the dashboard
+    log_path = Path(__file__).parent / "logs" / "bot.log"
+    log_path.parent.mkdir(exist_ok=True)
+    log_file = open(log_path, "a")
+
+    # Launch the bot with the same Python interpreter running the dashboard.
+    # Logs go to logs/bot.log so they're readable even when the dashboard is the launcher.
     proc = subprocess.Popen(
         [sys.executable, str(Path(__file__).parent / "main.py")],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=log_file,
+        stderr=log_file,
         # Detach from the current process group so it survives dashboard restarts
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,
     )

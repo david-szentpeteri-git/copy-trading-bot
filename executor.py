@@ -61,30 +61,43 @@ def _execute_buy(trade: Dict) -> bool:
     trader_usdc_spent = float(trade["usdc_size"])
     their_tx_hash = trade.get("transaction_hash", "")
 
-    # Step 1: Estimate the tracked trader's total portfolio value
+    # Step 1: Estimate the tracked trader's total portfolio value.
+    # bullpen positions --address only works for our own wallet, so this will
+    # often return None for external traders. Fall back to cap-based sizing.
     trader_portfolio = portfolio.estimate_portfolio_value(trader_address)
-    if not trader_portfolio or trader_portfolio <= 0:
-        msg = f"Could not estimate portfolio for trader {trader_address}"
-        logger.warning("%s — skipping BUY on '%s'", msg, title)
-        trade_log.log_failed("BUY_SKIPPED", trader_address, slug, condition_id, outcome, title, their_tx_hash, msg)
-        return False
 
-    # Step 2: Get our own available USDC balance
-    own_balance = portfolio.get_own_usdc_balance()
-    if not own_balance or own_balance <= 0:
-        msg = "Own USDC balance is zero or unavailable"
-        logger.warning("%s — skipping BUY on '%s'", msg, title)
-        trade_log.log_failed("BUY_SKIPPED", trader_address, slug, condition_id, outcome, title, their_tx_hash, msg)
-        return False
+    # Step 2: Get our own available USDC balance.
+    # In dry run mode use a simulated balance so trades execute without real funds.
+    if dry_run.is_enabled():
+        own_balance = 1000.0
+    else:
+        own_balance = portfolio.get_own_usdc_balance()
+        if not own_balance or own_balance <= 0:
+            msg = "Own USDC balance is zero or unavailable"
+            logger.warning("%s — skipping BUY on '%s'", msg, title)
+            trade_log.log_failed("BUY_SKIPPED", trader_address, slug, condition_id, outcome, title, their_tx_hash, msg)
+            return False
 
-    # Step 3: Calculate proportional stake, capped at the hard limit
-    size = portfolio.calculate_trade_size(
-        trader_trade_usdc=trader_usdc_spent,
-        trader_portfolio_usdc=trader_portfolio,
-        own_portfolio_usdc=own_balance,
-        cap_usdc=config.trade_cap_usdc,
-    )
-    trade_pct = trader_usdc_spent / trader_portfolio
+    # Step 3: Calculate proportional stake, capped at the hard limit.
+    # If we couldn't fetch the trader's portfolio, fall back to mirroring their
+    # raw spend directly (capped). e.g. trader spent $5 → we spend $5; $50 → $10.
+    if trader_portfolio and trader_portfolio > 0:
+        size = portfolio.calculate_trade_size(
+            trader_trade_usdc=trader_usdc_spent,
+            trader_portfolio_usdc=trader_portfolio,
+            own_portfolio_usdc=own_balance,
+            cap_usdc=config.trade_cap_usdc,
+        )
+        trade_pct = trader_usdc_spent / trader_portfolio
+    else:
+        # Portfolio unknown — mirror the trade amount directly, capped
+        size = min(trader_usdc_spent, config.trade_cap_usdc, own_balance)
+        size = round(size, 2)
+        trade_pct = 0.0
+        logger.info(
+            "Portfolio estimate unavailable for %s — using raw trade size $%.2f (capped at $%.2f)",
+            trader_address, trader_usdc_spent, config.trade_cap_usdc,
+        )
 
     # Skip dust orders that would be rejected by the exchange
     if size < 0.10:
@@ -95,7 +108,7 @@ def _execute_buy(trade: Dict) -> bool:
 
     logger.info(
         "BUY '%s' → %s | trader: $%.2f (%.2f%% of $%.0f) → our bet: $%.2f",
-        title, outcome, trader_usdc_spent, trade_pct * 100, trader_portfolio, size,
+        title, outcome, trader_usdc_spent, trade_pct * 100, trader_portfolio or 0, size,
     )
 
     # Step 4: Place the order and capture the result

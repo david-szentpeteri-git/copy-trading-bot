@@ -27,11 +27,16 @@ def estimate_portfolio_value(address: str) -> Optional[float]:
     try:
         positions = bullpen.get_positions(address)
 
-        # Sum the current USDC value across all open positions
-        # 'cash_pnl' + 'initial_value' gives approximate current value
+        # Log raw structure once so we can see what bullpen actually returns
+        if positions:
+            logger.debug("get_positions raw sample: %r", positions[0])
+
+        # Guard: skip any entries that aren't dicts (bullpen sometimes returns
+        # a flat list of strings instead of objects when positions are sparse)
         position_value = sum(
             float(p.get("current_value", 0) or 0)
             for p in positions
+            if isinstance(p, dict)
         )
 
         return position_value if position_value > 0 else None
@@ -50,10 +55,11 @@ def get_own_usdc_balance() -> Optional[float]:
     try:
         balances = bullpen.get_own_balances()
 
-        # Bullpen returns a nested structure; dig out the Polymarket USDC value
-        for entry in balances:
-            if isinstance(entry, dict) and entry.get("chain") == "polymarket":
-                return float(entry.get("balance_usdc", 0))
+        # Bullpen returns {"chains": [...], "total_usd": ...}
+        # Find the Polymarket chain entry by label
+        for entry in balances.get("chains", []):
+            if isinstance(entry, dict) and entry.get("label") == "Polymarket":
+                return float(entry.get("total_usd", 0))
 
         return None
 

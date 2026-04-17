@@ -261,6 +261,63 @@ def _render_trade_table(trades: List[Dict], is_dry: bool) -> None:
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
+def _render_trader_stats(trades: List[Dict]) -> None:
+    """Render a per-trader breakdown of trade count, win rate, and PnL.
+
+    Args:
+        trades: All trade log entries (newest-first).
+    """
+    # Aggregate stats keyed by trader address
+    stats: Dict[str, Dict] = {}
+
+    # First pass: build cost basis per trader per market
+    cost_basis: Dict[str, Dict[str, float]] = {}
+    for t in reversed(trades):
+        addr = t.get("copied_from") or t.get("trader_address", "unknown")
+        if t["event"] == "BUY_EXECUTED":
+            key = f"{t['condition_id']}:{t['outcome']}"
+            cost_basis.setdefault(addr, {})
+            cost_basis[addr][key] = cost_basis[addr].get(key, 0) + t.get("our_usdc_size", 0)
+
+    for t in trades:
+        addr = t.get("copied_from") or t.get("trader_address", "unknown")
+        if addr not in stats:
+            stats[addr] = {"trades": 0, "wins": 0, "losses": 0, "realized_pnl": 0.0}
+
+        if t["event"] == "BUY_EXECUTED":
+            stats[addr]["trades"] += 1
+        elif t["event"] == "SELL_EXECUTED":
+            usdc_received = t.get("usdc_received", 0)
+            sell_pct = t.get("sell_pct", 1.0)
+            key = f"{t['condition_id']}:{t['outcome']}"
+            cost = cost_basis.get(addr, {}).get(key, 0) * sell_pct
+            pnl = usdc_received - cost
+            stats[addr]["realized_pnl"] += pnl
+            if pnl >= 0:
+                stats[addr]["wins"] += 1
+            else:
+                stats[addr]["losses"] += 1
+
+    if not stats:
+        st.info("No trader data yet.")
+        return
+
+    rows = []
+    for addr, s in stats.items():
+        closed = s["wins"] + s["losses"]
+        win_rate = (s["wins"] / closed * 100) if closed > 0 else 0.0
+        rows.append({
+            "Trader": addr[:10] + "..." + addr[-6:],
+            "Trades Copied": s["trades"],
+            "Wins": s["wins"],
+            "Losses": s["losses"],
+            "Win Rate": f"{win_rate:.1f}%",
+            "Realized PnL": _pnl_str(s["realized_pnl"]),
+        })
+
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
 # ── Main dashboard ─────────────────────────────────────────────────────────────
 
 def render() -> None:
@@ -341,6 +398,12 @@ def render() -> None:
 
     st.markdown("#### 🧪 Dry Run Trades")
     _render_trade_table(trades, is_dry=True)
+
+    st.divider()
+
+    # ── Per-trader stats ──────────────────────────────────────────────────────
+    st.subheader("👤 Per-Trader Stats")
+    _render_trader_stats(trades)
 
     # ── Footer ────────────────────────────────────────────────────────────────
     st.caption(
