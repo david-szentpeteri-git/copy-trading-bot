@@ -101,6 +101,7 @@ def record_buy(
     trader_usdc_size: float,
     our_tokens: float,
     our_usdc_spent: float,
+    is_dry_run: bool = False,
 ) -> None:
     """Record a successful BUY in our position state.
 
@@ -117,6 +118,7 @@ def record_buy(
         trader_usdc_size: How much USDC the tracked trader spent (needed for sell % calc).
         our_tokens: Number of outcome tokens we received.
         our_usdc_spent: USDC we spent on this buy.
+        is_dry_run: True if this position was opened in dry run mode.
     """
     key = _position_key(condition_id, outcome)
 
@@ -129,6 +131,7 @@ def record_buy(
             "our_tokens": 0.0,
             "our_usdc_spent": 0.0,
             "recovered": False,
+            "dry_run": is_dry_run,
             "traders": {},
         }
 

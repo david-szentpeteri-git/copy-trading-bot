@@ -145,6 +145,7 @@ def _execute_buy(trade: Dict) -> bool:
             trader_usdc_size=trader_usdc_spent,
             our_tokens=our_tokens,
             our_usdc_spent=size,
+            is_dry_run=dry_run.is_enabled(),
         )
 
         trade_log.log_buy_executed(

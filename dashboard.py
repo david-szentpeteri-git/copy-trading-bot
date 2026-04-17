@@ -379,6 +379,17 @@ def render() -> None:
                 no_duplicates.enable()
                 st.rerun()
 
+    with c4:
+        st.markdown("&nbsp;", unsafe_allow_html=True)
+        if st.button("🗑️ Clear Dry Run History", use_container_width=False):
+            result = dry_run.reset_dry_run_data()
+            st.success(
+                f"Cleared {result['removed_trades']} dry run trades, "
+                f"{result['removed_positions']} positions. "
+                "Bot will replay recent trades on next poll."
+            )
+            st.rerun()
+
     st.divider()
 
     # ── Load data ─────────────────────────────────────────────────────────────
