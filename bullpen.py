@@ -108,20 +108,21 @@ def get_own_balances() -> Dict:
     return _run(["portfolio", "balances"])
 
 
-def get_price(condition_id: str, outcome: str) -> Optional[float]:
+def get_price(slug: str, outcome: str) -> Optional[float]:
     """Fetch the current midpoint price for a market outcome.
 
     Used to calculate unrealized PnL on open positions.
 
     Args:
-        condition_id: Polymarket market condition ID.
+        slug: Polymarket market slug (e.g. "nba-tor-cle-2026-04-18").
+              Note: the CLI requires a slug, not a condition_id.
         outcome: Outcome label (e.g. "Yes", "Trail Blazers").
 
     Returns:
         Midpoint price as a float (0.0–1.0), or None if unavailable.
     """
     try:
-        data = _run(["polymarket", "price", condition_id, outcome])
+        data = _run(["polymarket", "price", slug, outcome])
         # Bullpen returns a dict with 'mid', 'best_bid', 'best_ask', etc.
         return float(data.get("mid") or data.get("last") or 0)
     except Exception:

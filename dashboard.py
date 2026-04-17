@@ -19,6 +19,7 @@ import streamlit as st
 import bot_control
 import bullpen
 import dry_run
+import no_duplicates
 from config import config
 
 # ── Page config ────────────────────────────────────────────────────────────────
@@ -80,7 +81,7 @@ def fetch_live_prices(positions: Dict[str, Any]) -> Dict[str, float]:
     """
     prices = {}
     for key, pos in positions.items():
-        price = bullpen.get_price(pos["condition_id"], pos["outcome"])
+        price = bullpen.get_price(pos["slug"], pos["outcome"])
         if price is not None:
             prices[key] = price
     return prices
@@ -363,6 +364,20 @@ def render() -> None:
                 if st.button("Enable Dry Run", use_container_width=True):
                     dry_run.enable()
                     st.rerun()
+
+    # ── Secondary controls row ────────────────────────────────────────────────
+    c3, c4 = st.columns([1, 3])
+    with c3:
+        if no_duplicates.is_enabled():
+            st.info("🚫 Skip Duplicates: ON")
+            if st.button("Allow duplicate buys", use_container_width=True):
+                no_duplicates.disable()
+                st.rerun()
+        else:
+            st.warning("♻️ Skip Duplicates: OFF")
+            if st.button("Skip duplicate positions", use_container_width=True):
+                no_duplicates.enable()
+                st.rerun()
 
     st.divider()
 

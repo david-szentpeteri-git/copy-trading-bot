@@ -34,6 +34,33 @@ def _append(entry: Dict[str, Any]) -> None:
         f.write(json.dumps(entry) + "\n")
 
 
+def get_dry_run_total_spent() -> float:
+    """Sum all USDC spent in dry-run BUY_EXECUTED entries from the trade log.
+
+    Used to compute the remaining simulated balance so dry-run mode
+    realistically depletes from the $1000 starting virtual balance.
+
+    Returns:
+        Total USDC spent across all dry-run BUY trades so far.
+    """
+    if not os.path.exists(config.trade_log_file):
+        return 0.0
+
+    total = 0.0
+    with open(config.trade_log_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                if entry.get("event") == "BUY_EXECUTED" and entry.get("dry_run"):
+                    total += entry.get("our_usdc_size", 0.0)
+            except json.JSONDecodeError:
+                continue
+    return total
+
+
 def log_redeemed(
     condition_id: str,
     outcome: str,

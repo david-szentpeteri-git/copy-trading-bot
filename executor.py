@@ -10,6 +10,7 @@ from typing import Dict
 
 import bullpen
 import dry_run
+import no_duplicates
 import portfolio
 import state
 import trade_log
@@ -61,15 +62,30 @@ def _execute_buy(trade: Dict) -> bool:
     trader_usdc_spent = float(trade["usdc_size"])
     their_tx_hash = trade.get("transaction_hash", "")
 
+    # Step 0: Skip if we already hold this outcome and no-duplicate mode is on.
+    if no_duplicates.is_enabled() and state.get_position(condition_id, outcome):
+        logger.info(
+            "Already hold '%s' → %s — skipping duplicate BUY (no-duplicate mode ON)",
+            title, outcome,
+        )
+        return False
+
     # Step 1: Estimate the tracked trader's total portfolio value.
     # bullpen positions --address only works for our own wallet, so this will
     # often return None for external traders. Fall back to cap-based sizing.
     trader_portfolio = portfolio.estimate_portfolio_value(trader_address)
 
     # Step 2: Get our own available USDC balance.
-    # In dry run mode use a simulated balance so trades execute without real funds.
+    # In dry run mode use a simulated $1000 that depletes as trades are placed,
+    # so we can't over-spend virtual funds.
     if dry_run.is_enabled():
-        own_balance = 1000.0
+        dry_run_spent = trade_log.get_dry_run_total_spent()
+        own_balance = max(0.0, 1000.0 - dry_run_spent)
+        if own_balance <= 0:
+            msg = "Simulated dry-run balance exhausted ($1000 spent)"
+            logger.warning("%s — skipping BUY on '%s'", msg, title)
+            trade_log.log_failed("BUY_SKIPPED", trader_address, slug, condition_id, outcome, title, their_tx_hash, msg)
+            return False
     else:
         own_balance = portfolio.get_own_usdc_balance()
         if not own_balance or own_balance <= 0:
