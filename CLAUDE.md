@@ -1,5 +1,20 @@
 # CLAUDE.md
 
+@/root/.claude/primer.md
+@.claude-memory.md
+
+## PROJECT CONTEXT
+
+**Project:** Polymarket Copy Trading Bot
+A bot that monitors tracked trader wallets on Polymarket and automatically mirrors their trades proportionally on your own account.
+
+## PROJECT RULES
+
+- Read `tasks/lessons.md` at the start of every session for hard-won context.
+- Update `tasks/todo.md` as you complete or discover work items.
+
+---
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Behavior Guidelines

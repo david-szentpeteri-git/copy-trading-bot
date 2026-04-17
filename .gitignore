@@ -3,3 +3,4 @@ logs/trades.json
 logs/positions.json
 __pycache__/
 *.pyc
+.claude-memory.md
